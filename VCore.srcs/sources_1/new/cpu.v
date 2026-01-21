@@ -1,150 +1,140 @@
 module cpu(input clk,
            input rst);
     
-    reg[7:0] state = 0;
+    wire[5:0] flush;
+    wire[5:0] stall;
+    wire[1:0] forward_ex_mem;
+    wire[1:0] forward_mem_wb;
     
-    reg[31:0] pc;
+    wire pc_we_exs;
+    wire[31:0] pc_new_exs;
+    wire[31:0] pc;
     
-    wire[31:0] inst_from;
-    reg[31:0] inst_to;
+    wire[31:0] inst;
     
-    wire we_from;
-    reg we_to = 0;
+    wire[4:0] rs1;
+    wire[4:0] rs2;
+    wire[31:0] imm;
+    wire[7:0] op;
+    wire[4:0] rd[4:0];
     
-    wire[4:0] rd_from[3:0];
-    reg[4:0] rd_to[3:0];
+    wire[31:0] a;
+    wire[31:0] b;
+    wire[31:0] result;
+    wire[31:0] addr;
+    wire rd_we[4:0];
+    wire[5:0] ulrw[4:0];
     
-    wire[31:0] a_from;
-    reg[31:0] a_to;
+    wire[31:0] data[4:0];
     
-    wire[31:0] b_from;
-    reg[31:0] b_to;
+    cu cu(
+    .clk(clk),
+    .rst(rst),
+    .op(op),
+    .id_ex_rs1(rs1),
+    .id_ex_rs2(rs2),
+    .ex_mem_rd(rd[2]),
+    .ex_mem_rd_we(rd_we[2]),
+    .ex_mem_ulrw(ulrw[2]),
+    .mem_wb_rd(rd[3]),
+    .mem_wb_rd_we(rd_we[3]),
+    .mem_wb_ulrw(ulrw[3]),
+    .flush(flush),
+    .stall(stall),
+    .forward_ex_mem(forward_ex_mem),
+    .forward_mem_wb(forward_mem_wb)
+    );
     
-    wire[31:0] imm_from;
-    reg[31:0] imm_to;
-    
-    wire[31:0] op_from;
-    reg[31:0] op_to;
-    
-    wire rd_we_from[3:0];
-    reg rd_we_to[3:0];
-    
-    wire[1:0] rw_from;
-    reg[1:0] rw_to;
-    
-    wire[31:0] data_from[3:0];
-    reg[31:0] data_to[3:0];
-    
-    wire[31:0] addr_from;
-    reg[31:0] addr_to;
+    pc_reg pc_reg(
+    .clk(clk),
+    .rst(rst),
+    .flush(flush),
+    .stall(stall),
+    .pc_we(pc_we_exs),
+    .pc_new(pc_new_exs),
+    .pc(pc)
+    );
     
     ifs ifs(
     .clk(clk),
     .rst(rst),
+    .flush(flush),
+    .stall(stall),
     .pc(pc),
-    .inst(inst_from)
+    .inst(inst)
     );
     
     ids ids(
     .clk(clk),
+    .flush(flush),
+    .stall(stall),
+    .inst(inst),
+    .rs1(rs1),
+    .rs2(rs2),
+    .imm(imm),
+    .op(op),
+    .rd(rd[1])
+    );
+    
+    regfile regfile(
+    .clk(clk),
     .rst(rst),
-    .inst(inst_to),
-    .we(we_to),
-    .rd_to(rd_to[0]),
-    .wdata(data_to[0]),
-    .a(a_from),
-    .b(b_from),
-    .imm(imm_from),
-    .op(op_from),
-    .rd_from(rd_from[0])
+    .raddr1(rs1),
+    .rdata1(a),
+    .raddr2(rs2),
+    .rdata2(b),
+    .we(rd_we[4]),
+    .waddr(rd[4]),
+    .wdata(data[4])
     );
     
     exs exs(
     .clk(clk),
-    .a(a_to),
-    .b(b_to),
-    .imm(imm_to),
-    .op(op_to),
-    .rd_to(rd_to[1]),
-    .rd_from(rd_from[1]),
-    .rd_we(rd_we_from[1]),
-    .addr(addr_from),
-    .rw(rw_from),
-    .data(data_from[1])
+    .flush(flush),
+    .stall(stall),
+    .pc(pc),
+    .a(forward_ex_mem[0]?result:forward_mem_wb[0]?data[3]:a),
+    .b(forward_ex_mem[1]?result:forward_mem_wb[1]?data[3]:b),
+    .imm(imm),
+    .op(op),
+    .rd_to(rd[1]),
+    .rd_from(rd[2]),
+    .rd_we(rd_we[2]),
+    .ulrw(ulrw[2]),
+    .result(result),
+    .addr(addr),
+    .pc_we(pc_we_exs),
+    .pc_new(pc_new_exs)
     );
     
     mems mems(
     .clk(clk),
-    .rd_we_to(rd_we_to[2]),
-    .rw(rw_to),
-    .addr(addr_to),
-    .wdata(data_to[2]),
-    .rd_to(rd_to[2]),
-    .rd_from(rd_from[2]),
-    .rd_we_from(rd_we_from[2]),
-    .data(data_from[2])
+    .rst(rst),
+    .flush(flush),
+    .stall(stall),
+    .rd_we_to(rd_we[2]),
+    .ulrw_to(ulrw[2]),
+    .addr(addr),
+    .data_to(result),
+    .rd_to(rd[2]),
+    .rd_from(rd[3]),
+    .rd_we_from(rd_we[3]),
+    .ulrw_from(ulrw[3]),
+    .data_from(data[3])
     );
     
     wbs wbs(
     .clk(clk),
-    .rd_to(rd_to[3]),
-    .rd_we(rd_we_to[3]),
-    .data_to(data_to[3]),
-    .rd_from(rd_from[3]),
-    .we_from(we_from),
-    .data_from(data_from[3])
+    .flush(flush),
+    .stall(stall),
+    .rd_we_to(rd_we[3]),
+    .ulrw_to(ulrw[3]),
+    .rd_to(rd[3]),
+    .data_to(data[3]),
+    .rd_from(rd[4]),
+    .rd_we_from(rd_we[4]),
+    .ulrw_from(ulrw[4]),
+    .data_from(data[4])
     );
-    
-    always @(posedge clk or negedge rst) begin
-        if (rst == 0)begin
-            state <= 0;
-            pc    <= 0;
-        end
-        else begin
-            case (state)
-                1:begin
-                    we_to <= 0;
-                    
-                    inst_to <= inst_from;
-                    
-                    state <= state+1;
-                end
-                3:begin
-                    a_to     <= a_from;
-                    b_to     <= b_from;
-                    op_to    <= op_from;
-                    imm_to   <= imm_from;
-                    rd_to[1] <= rd_from[0];
-                    
-                    state <= state+1;
-                end
-                5:begin
-                    rd_to[2]    <= rd_from[1];
-                    rd_we_to[2] <= rd_we_from[1];
-                    addr_to     <= addr_from;
-                    data_to[2]  <= data_from[1];
-                    rw_to       <= rw_from;
-                    
-                    state <= state+1;
-                end
-                7:begin
-                    rd_to[3]    <= rd_from[2];
-                    rd_we_to[3] <= rd_we_from[2];
-                    data_to[3]  <= data_from[2];
-                    
-                    state <= state+1;
-                end
-                9:begin
-                    rd_to[0]   <= rd_from[3];
-                    we_to      <= we_from;
-                    data_to[0] <= data_from[3];
-                    
-                    state <= 0;
-                    pc    <= pc+4;
-                end
-                default:state <= state+1;
-            endcase
-        end
-    end
     
 endmodule

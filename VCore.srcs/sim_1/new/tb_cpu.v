@@ -10,15 +10,15 @@ module tb_cpu();
     .rst(rst)
     );
     
-    always #10 clk = ~clk;
+    always #1 clk = ~clk;
     
     initial begin
-        #10;
+        #1;
         rst = 0;
-        #10;
+        #1;
         rst = 1;
-        #1000
-        $stop;
+        #100;
+        $finish;
     end
     
 endmodule

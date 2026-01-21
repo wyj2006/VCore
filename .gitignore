@@ -3,3 +3,8 @@ VCore.cache
 VCore.sim
 VCore.hw
 VCore.ip_user_files
+*.bin
+*.elf
+*.o
+tests/test.txt
+VCore.srcs/sources_1/new/inst_def.vh
