@@ -22,7 +22,12 @@ module regfile(input clk,
     end
     
     always @(posedge clk) begin
-        if (we) x[waddr] <= wdata;
+        if (we)begin
+            case(waddr)
+                0:;
+                default:x[waddr] <= wdata;
+            endcase
+        end
     end
     
     assign rdata1 = x[raddr1];
