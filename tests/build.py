@@ -7,10 +7,10 @@ filename, ext = os.path.splitext(filepath)
 
 match ext:
     case ".s":
-        os.system(f"riscv32-unknown-elf-as {filepath} -o {filename}.o -march=rv32i")
+        os.system(f"riscv32-unknown-elf-as {filepath} -o {filename}.o -march=rv32im")
     case ".c":
         os.system(
-            f"riscv32-unknown-elf-gcc {filepath} -o {filename}.o -c -march=rv32i -mabi=ilp32"
+            f"riscv32-unknown-elf-gcc {filepath} -o {filename}.o -c -march=rv32im -mabi=ilp32"
         )
 
 os.system(f"riscv32-unknown-elf-ld {filename}.o -o {filename}.elf")

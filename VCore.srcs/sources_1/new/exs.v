@@ -1,6 +1,7 @@
 `include "inst_def.vh"
 
 module exs(input clk,
+           input rst,
            input[5:0] flush,
            input[5:0] stall,
            input[31:0] pc,
@@ -15,7 +16,49 @@ module exs(input clk,
            output reg[31:0] result,
            output reg[31:0] addr,
            output reg pc_we,
-           output reg[31:0] pc_new);
+           output reg[31:0] pc_new,
+           output reg[5:0] stall_req);
+    
+    wire [63:0] signed_64_a   = $signed(a);
+    wire [63:0] signed_64_b   = $signed(b);
+    wire [63:0] unsigned_64_a = $unsigned(a);
+    wire [63:0] unsigned_64_b = $unsigned(b);
+    //s表示有符号, u表示无符号
+    wire [63:0] ss_result = signed_64_a*signed_64_b;
+    wire [63:0] su_result = signed_64_a*unsigned_64_b;
+    wire [63:0] uu_result = unsigned_64_a*unsigned_64_b;
+    
+    reg [31:0] dividend;
+    reg [31:0] divisor;
+    reg [7:0] divrem_op;
+    reg divrem_en;
+    reg [6:0] divrem_left;//距离计算出结果还有多少个周期
+    wire [63:0] divrem_s_result;
+    wire [63:0] divrem_u_result;
+    
+    div_signed div_signed(
+    .aclk(clk),
+    .s_axis_dividend_tdata(dividend),
+    .s_axis_divisor_tdata(divisor),
+    .s_axis_dividend_tvalid(1),
+    .s_axis_divisor_tvalid(1),
+    .m_axis_dout_tdata(divrem_s_result),
+    .aclken(divrem_en)
+    );
+    
+    div_unsigned div_unsigned(
+    .aclk(clk),
+    .s_axis_dividend_tdata(dividend),
+    .s_axis_divisor_tdata(divisor),
+    .s_axis_dividend_tvalid(1),
+    .s_axis_divisor_tvalid(1),
+    .m_axis_dout_tdata(divrem_u_result),
+    .aclken(divrem_en)
+    );
+    
+    always @(negedge rst) begin
+        stall_req <= 0;
+    end
     
     always @(posedge clk) begin
         case(1)
@@ -27,10 +70,14 @@ module exs(input clk,
             end
             stall[3]:;
             default:begin
-                ulrw    <= 0;
-                rd_we   <= 0;
-                pc_we   <= 0;
-                rd_from <= rd_to;
+                dividend  <= a;
+                divisor   <= b;
+                divrem_en <= 0;
+                ulrw      <= 0;
+                rd_we     <= 0;
+                pc_we     <= 0;
+                rd_from   <= rd_to;
+                divrem_op <= op;
                 case (op)
                     `LUI:begin
                         result <= imm;
@@ -188,10 +235,60 @@ module exs(input clk,
                         result <= a&b;
                         rd_we  <= 1;
                     end
+                    `MUL:begin
+                        result <= ss_result[31:0];
+                        rd_we  <= 1;
+                    end
+                    `MULH:begin
+                        result <= ss_result[63:32];
+                        rd_we  <= 1;
+                    end
+                    `MULHSU:begin
+                        result <= su_result[63:32];
+                        rd_we  <= 1;
+                    end
+                    `MULHU:begin
+                        result <= uu_result[63:32];
+                        rd_we  <= 1;
+                    end
+                    `DIV,`REM:begin
+                        divrem_en   <= 1;
+                        divrem_left <= 36;
+                        stall_req   <= 'b111111;
+                    end
+                    `DIVU,`REMU:begin
+                        divrem_en   <= 1;
+                        divrem_left <= 34;
+                        stall_req   <= 'b111111;
+                    end
                     default:;
                 endcase
             end
         endcase
     end
     
+    always @(posedge clk) begin
+        if (divrem_en == 1)begin
+            divrem_left <= divrem_left-1;
+            if (divrem_left == 0)begin
+                stall_req <= 0;
+                divrem_en <= 0;
+                rd_we     <= 1;
+                case(divrem_op)
+                    `DIV:begin
+                        result <= divrem_s_result[63:32];
+                    end
+                    `DIVU:begin
+                        result <= divrem_u_result[63:32];
+                    end
+                    `REM:begin
+                        result <= divrem_s_result[31:0];
+                    end
+                    `REMU:begin
+                        result <= divrem_u_result[31:0];
+                    end
+                endcase
+            end
+        end
+    end
 endmodule

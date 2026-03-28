@@ -3,6 +3,7 @@ module cpu(input clk,
     
     wire[5:0] flush;
     wire[5:0] stall;
+    wire[5:0] stall_req;
     wire[1:0] forward_ex_mem;
     wire[1:0] forward_mem_wb;
     
@@ -23,6 +24,12 @@ module cpu(input clk,
     wire[31:0] result;
     wire[31:0] addr;
     wire rd_we[4:0];
+    /*
+     u: 是否是无符号整数
+     l: 长度
+     r: 读内存
+     w: 写内存
+     */
     wire[5:0] ulrw[4:0];
     
     wire[31:0] data[4:0];
@@ -30,7 +37,8 @@ module cpu(input clk,
     cu cu(
     .clk(clk),
     .rst(rst),
-    .op(op),
+    .stall_req(stall_req),
+    .pc_we(pc_we_exs),
     .id_ex_rs1(rs1),
     .id_ex_rs2(rs2),
     .ex_mem_rd(rd[2]),
@@ -90,6 +98,7 @@ module cpu(input clk,
     
     exs exs(
     .clk(clk),
+    .rst(rst),
     .flush(flush),
     .stall(stall),
     .pc(pc),
@@ -104,7 +113,8 @@ module cpu(input clk,
     .result(result),
     .addr(addr),
     .pc_we(pc_we_exs),
-    .pc_new(pc_new_exs)
+    .pc_new(pc_new_exs),
+    .stall_req(stall_req)
     );
     
     mems mems(

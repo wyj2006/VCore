@@ -1,7 +1,5 @@
-addi x1,x1,1	#x1= 1
-addi x2,x2,1	#x2 = 1
+addi t0,x0,7    #x5=2
+addi t1,x0,2    #x6=2
+div t2,t0,t1    #x7=x5/x6
 loop:
-add x3,x1,x2	#x3=x1+x2
-addi x1,x2,0	#x1 = x2
-addi x2,x3,0	#x2 = x3
-jal x0,loop
+j loop

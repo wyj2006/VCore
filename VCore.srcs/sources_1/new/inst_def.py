@@ -64,6 +64,15 @@ class Instruction(Enum):
     CSSRRSI = auto()
     CSRRCI = auto()
 
+    MUL = auto()
+    MULH = auto()
+    MULHSU = auto()
+    MULHU = auto()
+    DIV = auto()
+    DIVU = auto()
+    REM = auto()
+    REMU = auto()
+
 
 with open("inst_def.vh", mode="w", encoding="utf-8") as file:
     for i in Instruction:

@@ -2,7 +2,8 @@
 
 module cu(input clk,
           input rst,
-          input[7:0] op,
+          input [5:0] stall_req,
+          input pc_we,
           input[4:0] id_ex_rs1,
           input[4:0] id_ex_rs2,
           input[4:0] ex_mem_rd,
@@ -16,9 +17,10 @@ module cu(input clk,
           output[1:0] forward_ex_mem,
           output[1:0] forward_mem_wb);
     
-    assign flush = op == `JAL||op == `JALR||`B_TYPE_START<op&&op<`B_TYPE_END?'b000111:0;
-    assign stall = ex_mem_ulrw[1:0] == 2'b10&&(ex_mem_rd == id_ex_rs1||ex_mem_rd == id_ex_rs2)?'b001111:0;
-    
+    //如果要求全部阻塞的话就暂时不清空
+    assign flush = !(stall_req == 'b111111)&&pc_we == 1?'b001111:0;
+    assign stall = !(stall_req == 0)?stall_req:ex_mem_ulrw[1:0] == 2'b10&&(ex_mem_rd == id_ex_rs1||ex_mem_rd == id_ex_rs2)?'b001111:0;
+    //TODO 防止误判
     assign forward_ex_mem[0] = ex_mem_rd_we&&ex_mem_rd == id_ex_rs1;
     assign forward_ex_mem[1] = ex_mem_rd_we&&ex_mem_rd == id_ex_rs2;
     

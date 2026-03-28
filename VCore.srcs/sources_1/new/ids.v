@@ -113,23 +113,61 @@ module ids(input clk,
                             'b000:begin
                                 case(funct7)
                                     'b0000000:op <= `ADD;
+                                    'b0000001:op <= `MUL;
                                     'b0100000:op <= `SUB;
                                     default:;
                                 endcase
                             end
-                            'b001:op <= `SLL;
-                            'b010:op <= `SLT;
-                            'b011:op <= `SLTU;
-                            'b100:op <= `XOR;
+                            'b001:begin
+                                case(funct7)
+                                    'b0000000:op <= `SLL;
+                                    'b0000001:op <= `MULH;
+                                    default:;
+                                endcase
+                            end
+                            'b010:begin
+                                case(funct7)
+                                    'b0000000:op <= `SLT;
+                                    'b0000001:op <= `MULHSU;
+                                    default:;
+                                endcase
+                            end
+                            'b011:begin
+                                case(funct7)
+                                    'b0000000:op <= `SLTU;
+                                    'b0000001:op <= `MULHU;
+                                    default:;
+                                endcase
+                            end
+                            'b100:begin
+                                case(funct7)
+                                    'b0000000:op <= `XOR;
+                                    'b0000001:op <= `DIV;
+                                    default:;
+                                endcase
+                            end
                             'b101:begin
                                 case(funct7)
                                     'b0000000:op <= `SRL;
+                                    'b0000001:op <= `DIVU;
                                     'b0100000:op <= `SRA;
                                     default:;
                                 endcase
                             end
-                            'b110:op <= `OR;
-                            'b111:op <= `AND;
+                            'b110:begin
+                                case(funct7)
+                                    'b0000000:op <= `OR;
+                                    'b0000001:op <= `REM;
+                                    default:;
+                                endcase
+                            end
+                            'b111:begin
+                                case(funct7)
+                                    'b0000000:op <= `AND;
+                                    'b0000001:op <= `REMU;
+                                    default:;
+                                endcase
+                            end
                             default:;
                         endcase
                     end
