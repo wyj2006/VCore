@@ -117,6 +117,13 @@ typedef enum bit [6:0] {
     SFenceVMA
 } Opcode;
 
+typedef enum bit [1:0] {
+    Byte,
+    HalfWord,
+    Word,
+    DoubleWord
+} DataWidth;
+
 typedef struct {
     bit enable;
     bit [31:0] val;
@@ -132,7 +139,7 @@ typedef enum bit [1:0] {
 typedef struct {
     bit enable;
     bit [31:0] addr;
-    bit [2:0] width;
+    DataWidth width;
     RegKind kind;
     bit [4:0] target;
 } ReadMemReq;
@@ -140,7 +147,7 @@ typedef struct {
 typedef struct {
     bit enable;
     bit [31:0] addr;
-    bit [2:0] width;
+    DataWidth width;
     bit [63:0] data;
 } WriteMemReq;
 

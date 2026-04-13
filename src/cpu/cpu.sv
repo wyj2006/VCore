@@ -19,7 +19,7 @@ module cpu (
     ReadMemReq read_mem;
 
     bit [31:0] addr;
-    bit [31:0] width;
+    DataWidth width;
     bit cache_we;
     bit [63:0] cache_in;
     bit [63:0] cache_out;
@@ -170,7 +170,7 @@ module cpu (
 
                 addr <= pc;
                 pc <= pc + 4;
-                width <= 4;
+                width <= Word;
                 cache_we <= 0;
 
                 state <= ReadMem;
@@ -257,19 +257,19 @@ module cpu (
                         case (read_mem.kind)
                             IntReg: begin
                                 case (read_mem.width)
-                                    1: write_reg.val <= cache_out_i8;
-                                    2: write_reg.val <= cache_out_i16;
-                                    4: write_reg.val <= cache_out_i32;
+                                    Byte: write_reg.val <= cache_out_i8;
+                                    HalfWord: write_reg.val <= cache_out_i16;
+                                    Word, DoubleWord: write_reg.val <= cache_out_i32;
                                 endcase
                             end
                             UIntReg: begin
                                 case (read_mem.width)
-                                    1: write_reg.val <= cache_out_u8;
-                                    2: write_reg.val <= cache_out_u16;
-                                    4: write_reg.val <= cache_out_u32;
+                                    Byte: write_reg.val <= cache_out_u8;
+                                    HalfWord: write_reg.val <= cache_out_u16;
+                                    DoubleWord: write_reg.val <= cache_out_u32;
                                 endcase
                             end
-                            FloatReg, DoubleReg: write_reg.val <= cache_out[31:0];
+                            FloatReg, DoubleReg: write_reg.val <= cache_out;
                         endcase
                         state <= Fetch;
                     end

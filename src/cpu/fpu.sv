@@ -294,26 +294,26 @@ module fpu (
                     FLW: begin
                         read_mem.enable <= 1;
                         read_mem.addr   <= ia + imm;
-                        read_mem.width  <= 4;
+                        read_mem.width  <= Word;
                         read_mem.kind   <= FloatReg;
                     end
                     FLD: begin
                         read_mem.enable <= 1;
                         read_mem.addr   <= ia + imm;
-                        read_mem.width  <= 8;
+                        read_mem.width  <= DoubleWord;
                         read_mem.kind   <= DoubleReg;
                     end
                     FSW: begin
                         write_mem.enable <= 1;
                         write_mem.addr   <= ia + imm;
                         write_mem.data   <= fb[31:0];
-                        write_mem.width  <= 4;
+                        write_mem.width  <= Word;
                     end
                     FSD: begin
                         write_mem.enable <= 1;
                         write_mem.addr   <= ia + imm;
                         write_mem.data   <= fb;
-                        write_mem.width  <= 8;
+                        write_mem.width  <= DoubleWord;
                     end
                     FSgnJS: begin
                         write_reg.enable <= 1;

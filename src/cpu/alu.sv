@@ -155,22 +155,22 @@ module alu (
                         read_mem.addr   <= a + imm;
                         case (op)
                             LB: begin
-                                read_mem.width <= 1;
+                                read_mem.width <= Byte;
                                 read_mem.kind  <= IntReg;
                             end
                             LBU: begin
-                                read_mem.width <= 1;
+                                read_mem.width <= Byte;
                                 read_mem.kind  <= UIntReg;
                             end
                             LH: begin
-                                read_mem.width <= 2;
+                                read_mem.width <= HalfWord;
                                 read_mem.kind  <= IntReg;
                             end
                             LHU: begin
-                                read_mem.width <= 2;
+                                read_mem.width <= HalfWord;
                                 read_mem.kind  <= UIntReg;
                             end
-                            LW: read_mem.width <= 4;
+                            LW: read_mem.width <= Word;
                         endcase
                     end
                     SB, SH, SW: begin
@@ -178,9 +178,9 @@ module alu (
                         write_mem.addr   <= a + imm;
                         write_mem.data   <= b;
                         case (op)
-                            SB: write_mem.width <= 1;
-                            SH: write_mem.width <= 2;
-                            SW: write_mem.width <= 4;
+                            SB: write_mem.width <= Byte;
+                            SH: write_mem.width <= HalfWord;
+                            SW: write_mem.width <= Word;
                         endcase
                     end
                     AddI: begin

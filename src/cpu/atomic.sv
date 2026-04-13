@@ -52,7 +52,7 @@ module atomic (
                         read_mem.enable <= 1;
                         read_mem.addr <= a;
                         read_mem.kind <= IntReg;
-                        read_mem.width <= 4;
+                        read_mem.width <= Word;
                         read_mem.target <= rd;
 
                         out_ready <= 0;
@@ -63,13 +63,17 @@ module atomic (
                         write_mem.enable <= 1;
                         write_mem.addr <= a;
                         write_mem.data <= b;
-                        write_mem.width <= 4;
+                        write_mem.width <= Word;
 
                         write_reg.enable <= 1;
                         write_reg.val <= 0;
 
                         out_ready <= 0;
                         state <= WriteMem;
+                    end
+                    default: begin
+                        out_ready <= 0;
+                        state <= Idle;
                     end
                 endcase
             end
@@ -95,7 +99,7 @@ module atomic (
 
                 write_mem.enable <= 1;
                 write_mem.addr <= a;
-                write_mem.width <= 4;
+                write_mem.width <= Word;
                 state <= WriteMem;
                 case (op)
                     AMOSwapW: write_mem.data <= b;
