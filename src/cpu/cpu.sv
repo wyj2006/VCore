@@ -53,13 +53,15 @@ module cpu (
     bit [4:0] rs1;
     bit [4:0] rs2;
     bit [31:0] imm;
+    bit [11:0] csr_addr;
     decoder decoder (
         .inst(inst),
-        .op  (op),
-        .rd  (rd),
-        .rs1 (rs1),
-        .rs2 (rs2),
-        .imm (imm)
+        .op(op),
+        .rd(rd),
+        .rs1(rs1),
+        .rs2(rs2),
+        .imm(imm),
+        .csr_addr(csr_addr)
     );
 
     WriteRegReq write_reg;
@@ -149,14 +151,34 @@ module cpu (
         .write_reg(atom_write_reg)
     );
 
-    // always_ff @(negedge rst) begin
-    //     pc <= 0;
-    //     cache_we <= 0;
-    //     alu_in_ready <= 0;
-    //     fpu_in_ready <= 0;
-    //     atom_in_ready <= 0;
-    //     state <= Fetch;
-    // end
+    bit csr_unit_in_ready;
+    bit csr_unit_out_ready;
+    WriteRegReq csr_unit_write_reg;
+    csr_unit csr_unit (
+        .clk(clk),
+        .rst(rst),
+
+        .op(op),
+        .csr_addr(csr_addr),
+        .rd(rd),
+        .rs1(rs1),
+        .a(reg_value[0][31:0]),
+        .imm(imm),
+
+        .in_ready (csr_unit_in_ready),
+        .out_ready(csr_unit_out_ready),
+
+        .write_reg(csr_unit_write_reg)
+    );
+
+    always_ff @(negedge rst) begin
+        pc <= 0;
+        cache_we <= 0;
+        alu_in_ready <= 0;
+        fpu_in_ready <= 0;
+        atom_in_ready <= 0;
+        state <= Fetch;
+    end
 
     always_ff @(posedge clk) begin
         pre_state <= state;
@@ -179,13 +201,15 @@ module cpu (
                 alu_in_ready <= 1;
                 fpu_in_ready <= 1;
                 atom_in_ready <= 1;
+                csr_unit_in_ready <= 1;
                 state <= Execute;
             end
             Execute: begin
                 //只触发一次
-                alu_in_ready  <= 0;
-                fpu_in_ready  <= 0;
+                alu_in_ready <= 0;
+                fpu_in_ready <= 0;
                 atom_in_ready <= 0;
+                csr_unit_in_ready <= 0;
                 //out_ready同时最多只有一个是1
                 if (alu_out_ready) begin
 
@@ -241,6 +265,12 @@ module cpu (
                     state <= Fetch;
                     if (atom_write_reg.enable) begin
                         write_reg <= fpu_write_reg;
+                    end
+                end
+                if (csr_unit_out_ready) begin
+                    state <= Fetch;
+                    if (csr_unit_write_reg.enable) begin
+                        write_reg <= csr_unit_write_reg;
                     end
                 end
             end

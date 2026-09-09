@@ -1,0 +1,12 @@
+li x2,0x12345678
+csrrw x1,mscratch,x2
+li x2,0xf
+csrrs x1,mscratch,x2
+csrrc x1,mscratch,x2
+csrrwi x1,mscratch,5
+csrrsi x1,mscratch,3
+csrrci x1,mscratch,3
+csrrs x1,mscratch,x0
+csrrc x1,mscratch,x0
+csrrsi x1,mscratch,0
+csrrci x1,mscratch,0
