@@ -9,7 +9,8 @@ module cpu (
         Decode,
         Execute,
         ReadMem,
-        WriteMem
+        WriteMem,
+        DetectTrap
     } State;
     State state;
     State pre_state;
@@ -153,7 +154,9 @@ module cpu (
 
     bit csr_unit_in_ready;
     bit csr_unit_out_ready;
+    WriteCSRReq write_csr[3];
     WriteRegReq csr_unit_write_reg;
+    TrapRelatedCSRs trap_csrs;
     csr_unit csr_unit (
         .clk(clk),
         .rst(rst),
@@ -168,7 +171,36 @@ module cpu (
         .in_ready (csr_unit_in_ready),
         .out_ready(csr_unit_out_ready),
 
+        .ext_write_csr(write_csr),
+
+        .trap_csrs(trap_csrs),
         .write_reg(csr_unit_write_reg)
+    );
+
+    bit trap_ctrl_in_ready;
+    bit trap_ctrl_out_ready;
+    bit trap_ctrl_detect_in_ready;
+    bit trap_ctrl_detect_out_ready;
+    WritePCReq trap_ctrl_write_pc[2];
+    WriteCSRReq trap_ctrl_write_csr[3];
+    trap_controller trap_controller (
+        .clk(clk),
+        .rst(rst),
+
+        .pc(pc),
+
+        .op(op),
+        .in_ready(trap_ctrl_in_ready),
+        .out_ready(trap_ctrl_out_ready),
+
+        .detect_in_ready (trap_ctrl_detect_in_ready),
+        .detect_out_ready(trap_ctrl_detect_out_ready),
+
+        .has_exception(op inside {Illegal, EBreak, ECall}),
+
+        .trap_csrs(trap_csrs),
+        .write_pc (trap_ctrl_write_pc),
+        .write_csr(trap_ctrl_write_csr)
     );
 
     always_ff @(negedge rst) begin
@@ -177,6 +209,9 @@ module cpu (
         alu_in_ready <= 0;
         fpu_in_ready <= 0;
         atom_in_ready <= 0;
+        csr_unit_in_ready <= 0;
+        trap_ctrl_in_ready <= 0;
+        trap_ctrl_detect_in_ready <= 0;
         state <= Fetch;
     end
 
@@ -188,7 +223,6 @@ module cpu (
                 alu_in_ready <= 0;
                 fpu_in_ready <= 0;
                 atom_in_ready <= 0;
-                write_reg.enable <= 0;
 
                 addr <= pc;
                 pc <= pc + 4;
@@ -202,6 +236,8 @@ module cpu (
                 fpu_in_ready <= 1;
                 atom_in_ready <= 1;
                 csr_unit_in_ready <= 1;
+                trap_ctrl_in_ready <= 1;
+
                 state <= Execute;
             end
             Execute: begin
@@ -210,10 +246,11 @@ module cpu (
                 fpu_in_ready <= 0;
                 atom_in_ready <= 0;
                 csr_unit_in_ready <= 0;
+                trap_ctrl_in_ready <= 0;
+
                 //out_ready同时最多只有一个是1
                 if (alu_out_ready) begin
-
-                    state <= Fetch;
+                    state <= DetectTrap;
                     if (alu_write_pc.enable) begin
                         pc <= alu_write_pc.val;
                     end
@@ -237,9 +274,8 @@ module cpu (
                     if (alu_write_reg.enable) begin
                         write_reg <= alu_write_reg;
                     end
-                end
-                if (fpu_out_ready) begin
-                    state <= Fetch;
+                end else if (fpu_out_ready) begin
+                    state <= DetectTrap;
                     if (fpu_read_mem.enable) begin
                         addr <= fpu_read_mem.addr;
                         width <= fpu_read_mem.width;
@@ -260,17 +296,21 @@ module cpu (
                     if (fpu_write_reg.enable) begin
                         write_reg <= fpu_write_reg;
                     end
-                end
-                if (atom_out_ready) begin
-                    state <= Fetch;
+                end else if (atom_out_ready) begin
+                    state <= DetectTrap;
                     if (atom_write_reg.enable) begin
                         write_reg <= fpu_write_reg;
                     end
-                end
-                if (csr_unit_out_ready) begin
-                    state <= Fetch;
+                end else if (csr_unit_out_ready) begin
+                    state <= DetectTrap;
                     if (csr_unit_write_reg.enable) begin
                         write_reg <= csr_unit_write_reg;
+                    end
+                end else if (trap_ctrl_out_ready) begin
+                    state <= DetectTrap;
+                    write_csr <= trap_ctrl_write_csr;
+                    if (trap_ctrl_write_pc[1].enable) begin
+                        pc <= trap_ctrl_write_pc[1].val;
                     end
                 end
             end
@@ -301,13 +341,24 @@ module cpu (
                             end
                             FloatReg, DoubleReg: write_reg.val <= cache_out;
                         endcase
-                        state <= Fetch;
+                        state <= DetectTrap;
                     end
                 endcase
             end
             WriteMem: begin
                 cache_we <= 0;
-                state <= Fetch;
+                state <= DetectTrap;
+            end
+            DetectTrap: begin
+                trap_ctrl_detect_in_ready <= 1;
+                if (trap_ctrl_detect_out_ready) begin
+                    trap_ctrl_detect_in_ready <= 0;
+                    state <= Fetch;
+                    write_csr <= trap_ctrl_write_csr;
+                    if (trap_ctrl_write_pc[0].enable) begin
+                        pc <= trap_ctrl_write_pc[0].val;
+                    end
+                end
             end
         endcase
     end

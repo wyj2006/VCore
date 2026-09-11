@@ -4,6 +4,13 @@
 `define INT_REG_NUM 32
 `define FP_REG_NUM 32
 
+`define MSTATUS_ADDR 'h300
+`define MIE_ADDR 'h304
+`define MTVEC_ADDR 'h305
+`define MEPC_ADDR 'h341
+`define MCAUSE_ADDR 'h342
+`define MIP_ADDR 'h344
+
 typedef enum bit [6:0] {
     Lui,
     Auipc,
@@ -114,7 +121,8 @@ typedef enum bit [6:0] {
     SRet,
     MRet,
     WFI,
-    SFenceVMA
+    SFenceVMA,
+    Illegal
 } Opcode;
 
 typedef enum bit [1:0] {
@@ -158,10 +166,24 @@ typedef struct {
     bit [63:0] val;
 } WriteRegReq;
 
+typedef struct {
+    bit enable;
+    bit [11:0] addr;
+    bit [31:0] val;
+} WriteCSRReq;
+
 typedef enum bit [1:0] {
     User = 'b00,
     Supervisor = 'b01,
     Machine = 'b11
 } Mode;
+
+typedef struct {
+    bit [31:0] mstatus;
+    bit [31:0] mie;
+    bit [31:0] mtvec;
+    bit [31:0] mepc;
+    bit [31:0] mip;
+} TrapRelatedCSRs;
 
 `endif

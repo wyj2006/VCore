@@ -13,13 +13,14 @@ module decoder (
     bit [2:0] funct3;
     bit [6:0] funct7;
 
-    always @(inst) begin
+    always_comb begin
         rd = inst[11:7];
         rs1 = inst[19:15];
         rs2 = inst[24:20];
         funct3 = inst[14:12];
         funct7 = inst[31:25];
         csr_addr = inst[31:20];
+        op = Illegal;
         case (inst[6:0])
             'b0000011: begin
                 imm = $signed(inst[31:20]);
@@ -34,15 +35,15 @@ module decoder (
             'b0000111: begin
                 imm = $signed(inst[31:20]);
                 case (funct3)
-                    'b010: op <= FLW;
-                    'b011: op <= FLD;
+                    'b010: op = FLW;
+                    'b011: op = FLD;
                 endcase
             end
             'b0001111: begin
                 //TODO pred succ
                 case (funct3)
-                    'b000: op <= Fence;
-                    'b001: op <= FenceI;
+                    'b000: op = Fence;
+                    'b001: op = FenceI;
                 endcase
             end
             'b0010011: begin
@@ -79,24 +80,24 @@ module decoder (
             'b0100111: begin
                 imm = $signed({inst[31:25], inst[11:7]});
                 case (funct3)
-                    'b010: op <= FSW;
-                    'b011: op <= FSD;
+                    'b010: op = FSW;
+                    'b011: op = FSD;
                 endcase
             end
             'b0101111: begin
                 //TODO aq rl
                 case (funct7[6:2])
-                    'b00000: op <= AMOAddW;
-                    'b00001: op <= AMOSwapW;
-                    'b00010: op <= LRW;
-                    'b00011: op <= SCW;
-                    'b00100: op <= AMOXorW;
-                    'b01000: op <= AMOOrW;
-                    'b01100: op <= AMOAndW;
-                    'b10000: op <= AMOMinW;
-                    'b10100: op <= AMOMaxW;
-                    'b11000: op <= AMOMinUW;
-                    'b11100: op <= AMOMaxUW;
+                    'b00000: op = AMOAddW;
+                    'b00001: op = AMOSwapW;
+                    'b00010: op = LRW;
+                    'b00011: op = SCW;
+                    'b00100: op = AMOXorW;
+                    'b01000: op = AMOOrW;
+                    'b01100: op = AMOAndW;
+                    'b10000: op = AMOMinW;
+                    'b10100: op = AMOMaxW;
+                    'b11000: op = AMOMinUW;
+                    'b11100: op = AMOMaxUW;
                 endcase
             end
             'b0110011: begin
@@ -160,96 +161,96 @@ module decoder (
             'b1010011: begin
                 //TODO rm
                 case (funct7)
-                    'b0000000: op <= FAddS;
-                    'b0000001: op <= FAddD;
-                    'b0000100: op <= FSubS;
-                    'b0000101: op <= FSubD;
-                    'b0001000: op <= FMulS;
-                    'b0001001: op <= FMulD;
+                    'b0000000: op = FAddS;
+                    'b0000001: op = FAddD;
+                    'b0000100: op = FSubS;
+                    'b0000101: op = FSubD;
+                    'b0001000: op = FMulS;
+                    'b0001001: op = FMulD;
                     'b0001100: begin
                         case (rs2)
-                            'b00000: op <= FSqrtS;
-                            default: op <= FDivS;
+                            'b00000: op = FSqrtS;
+                            default: op = FDivS;
                         endcase
                     end
                     'b0001101: begin
                         case (rs2)
-                            'b00000: op <= FSqrtD;
-                            default: op <= FDivD;
+                            'b00000: op = FSqrtD;
+                            default: op = FDivD;
                         endcase
                     end
                     'b0010000: begin
                         case (funct3)
-                            'b000: op <= FSgnJS;
-                            'b001: op <= FSgnJNS;
-                            'b010: op <= FSgnJXS;
+                            'b000: op = FSgnJS;
+                            'b001: op = FSgnJNS;
+                            'b010: op = FSgnJXS;
                         endcase
                     end
                     'b0010001: begin
                         case (funct3)
-                            'b000: op <= FSgnJD;
-                            'b001: op <= FSgnJND;
-                            'b010: op <= FSgnJXD;
+                            'b000: op = FSgnJD;
+                            'b001: op = FSgnJND;
+                            'b010: op = FSgnJXD;
                         endcase
                     end
                     'b0010100: begin
                         case (funct3)
-                            'b000: op <= FMinS;
-                            'b001: op <= FMaxS;
+                            'b000: op = FMinS;
+                            'b001: op = FMaxS;
                         endcase
                     end
                     'b0010101: begin
                         case (funct3)
-                            'b000: op <= FMinD;
-                            'b001: op <= FMaxD;
+                            'b000: op = FMinD;
+                            'b001: op = FMaxD;
                         endcase
                     end
                     'b1010000: begin
                         case (funct3)
-                            'b000: op <= FLeS;
-                            'b001: op <= FLtS;
-                            'b010: op <= FEqS;
+                            'b000: op = FLeS;
+                            'b001: op = FLtS;
+                            'b010: op = FEqS;
                         endcase
                     end
                     'b1010001: begin
                         case (funct3)
-                            'b000: op <= FLeD;
-                            'b001: op <= FLtD;
-                            'b010: op <= FEqD;
+                            'b000: op = FLeD;
+                            'b001: op = FLtD;
+                            'b010: op = FEqD;
                         endcase
                     end
                     'b1100000: begin
                         case (rs2)
-                            'b00000: op <= FCvtWS;
+                            'b00000: op = FCvtWS;
                         endcase
                     end
                     'b1100001: begin
                         case (rs2)
-                            'b00000: op <= FCvtWD;
+                            'b00000: op = FCvtWD;
                         endcase
                     end
                     'b1101000: begin
                         case (rs2)
-                            'b00000: op <= FCvtSW;
+                            'b00000: op = FCvtSW;
                         endcase
                     end
                     'b1101001: begin
                         case (rs2)
-                            'b00000: op <= FMoveDW;
+                            'b00000: op = FMoveDW;
                         endcase
                     end
                     'b1110000: begin
                         case (funct3)
-                            'b000: op <= FMoveXW;
-                            'b001: op <= FClassS;
+                            'b000: op = FMoveXW;
+                            'b001: op = FClassS;
                         endcase
                     end
                     'b1110001: begin
                         case (funct3)
-                            'b001: op <= FClassD;
+                            'b001: op = FClassD;
                         endcase
                     end
-                    'b1111000: op <= FMoveWX;
+                    'b1111000: op = FMoveWX;
                 endcase
             end
             'b1101111: begin
@@ -276,19 +277,19 @@ module decoder (
                 case (funct3)
                     'b000:
                     case (csr_addr)
-                        'b000000000000: op <= ECall;
-                        'b000000000001: op <= EBreak;
-                        'b000100000010: op <= SRet;
-                        'b000100000101: op <= WFI;
-                        'b001100000010: op <= MRet;
-                        default: op <= SFenceVMA;
+                        'b000000000000: op = ECall;
+                        'b000000000001: op = EBreak;
+                        'b000100000010: op = SRet;
+                        'b000100000101: op = WFI;
+                        'b001100000010: op = MRet;
+                        default: op = SFenceVMA;
                     endcase
-                    'b001: op <= CSRRW;
-                    'b010: op <= CSRRS;
-                    'b011: op <= CSRRC;
-                    'b101: op <= CSRRWI;
-                    'b110: op <= CSRRSI;
-                    'b111: op <= CSRRCI;
+                    'b001: op = CSRRW;
+                    'b010: op = CSRRS;
+                    'b011: op = CSRRC;
+                    'b101: op = CSRRWI;
+                    'b110: op = CSRRSI;
+                    'b111: op = CSRRCI;
                 endcase
             end
         endcase

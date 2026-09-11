@@ -13,10 +13,6 @@ module cache (
 );
     bit [7:0] data[`CACHE_SIZE];
 
-    // always_ff @(negedge rst) begin
-    //     for (int i = 0; i < `CACHE_SIZE; i = i + 1) data[i] <= 0;
-    // end
-
     always_ff @(posedge clk) begin
         if (we) begin
             case (width)
