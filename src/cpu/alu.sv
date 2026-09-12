@@ -93,27 +93,20 @@ module alu (
     end
 
     always_ff @(posedge clk) begin
+        out_ready <= 0;
         write_reg.kind <= IntReg;
+        write_pc.enable <= 0;
+        read_mem.enable <= 0;
+        write_mem.enable <= 0;
+        write_reg.enable <= 0;
 
         case (state)
             Idle: begin
-                out_ready <= 0;
-
-                write_pc.enable <= 0;
-                read_mem.enable <= 0;
-                write_mem.enable <= 0;
-                write_reg.enable <= 0;
-
                 if (in_ready) state <= Run;
             end
             Run: begin
                 state <= Idle;
                 out_ready <= 1;
-
-                write_pc.enable <= 0;
-                read_mem.enable <= 0;
-                write_mem.enable <= 0;
-                write_reg.enable <= 0;
 
                 read_mem.target <= rd;
                 write_reg.index <= rd;

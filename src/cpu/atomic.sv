@@ -30,14 +30,13 @@ module atomic (
     bit [31:0] temp;
 
     always_ff @(posedge clk) begin
+        out_ready <= 0;
+        read_mem.enable <= 0;
+        write_mem.enable <= 0;
+        write_reg.enable <= 0;
+
         case (state)
             Idle: begin
-                out_ready <= 0;
-
-                read_mem.enable <= 0;
-                write_mem.enable <= 0;
-                write_reg.enable <= 0;
-
                 if (in_ready) state <= Run;
             end
             Run: begin
@@ -55,7 +54,6 @@ module atomic (
                         read_mem.width <= Word;
                         read_mem.target <= rd;
 
-                        out_ready <= 0;
                         state <= ReadMem;
                     end
                     SCW: begin
@@ -68,11 +66,9 @@ module atomic (
                         write_reg.enable <= 1;
                         write_reg.val <= 0;
 
-                        out_ready <= 0;
                         state <= WriteMem;
                     end
                     default: begin
-                        out_ready <= 0;
                         state <= Idle;
                     end
                 endcase

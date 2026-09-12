@@ -18,6 +18,7 @@ module cpu (
     bit [31:0] pc;
 
     ReadMemReq read_mem;
+    WriteRegReq write_reg_back;
 
     bit [31:0] addr;
     DataWidth width;
@@ -28,10 +29,10 @@ module cpu (
         .clk(clk),
         .rst(rst),
         //atomic模块的请求有更高优先级且不由cpu管理
-        .addr(atom_read_mem.enable?atom_read_mem.addr:(atom_write_mem.enable?atom_write_mem.addr:addr)),
-        .width(atom_read_mem.enable?atom_read_mem.width:(atom_write_mem.enable?atom_write_mem.width:width)),
-        .we(atom_write_mem.enable ? 1 : cache_we),
-        .in(atom_write_mem.enable ? atom_write_mem.data : cache_in),
+        .addr(addr),
+        .width(width),
+        .we(cache_we),
+        .in(cache_in),
         .out(cache_out)
     );
 
@@ -64,6 +65,20 @@ module cpu (
         .imm(imm),
         .csr_addr(csr_addr)
     );
+
+    bit execute_alu;
+    bit execute_fpu;
+    bit execute_atomic;
+    bit execute_csr_unit;
+    bit execute_trap_ctrl;
+    bit need_read_mem;
+
+    assign execute_alu = op inside {[Lui : RemU]};
+    assign execute_fpu = op inside {[FLW : FMoveDW]};
+    assign execute_atomic = op inside {[LRW : AMOMaxUW]};
+    assign execute_csr_unit = op inside {[CSRRW : CSRRCI]};
+    assign execute_trap_ctrl = op inside {MRet, ECall, EBreak, Illegal};
+    assign need_read_mem = op inside {LB, LH, LW, LBU, LHU, FLW, FSW, FLD, FSD, LRW};
 
     WriteRegReq write_reg;
     bit [63:0] reg_value[4];
@@ -203,6 +218,64 @@ module cpu (
         .write_csr(trap_ctrl_write_csr)
     );
 
+    always_comb begin
+        if (need_read_mem) write_reg = write_reg_back;
+        else if (execute_alu) write_reg = alu_write_reg;
+        else if (execute_fpu) write_reg = fpu_write_reg;
+        else if (execute_atomic) write_reg = atom_write_reg;
+        else if (execute_csr_unit) write_reg = csr_unit_write_reg;
+        else write_reg = {0, 0, IntReg, 0};
+    end
+
+    always_comb begin
+        addr = 0;
+        width = Word;
+        cache_in = 0;
+        cache_we = 0;
+        read_mem = {0, 0, Word, IntReg, 0};
+
+        if (execute_alu && alu_write_mem.enable) begin
+            addr = alu_write_mem.addr;
+            width = alu_write_mem.width;
+            cache_in = alu_write_mem.data;
+            cache_we = 1;
+        end else if (execute_fpu && fpu_write_mem.enable) begin
+            addr = fpu_write_mem.addr;
+            width = fpu_write_mem.width;
+            cache_in = fpu_write_mem.data;
+            cache_we = 1;
+        end else if (execute_atomic && atom_write_mem.enable) begin
+            addr = atom_write_mem.addr;
+            width = atom_write_mem.width;
+            cache_in = atom_write_mem.data;
+            cache_we = 1;
+        end else if (execute_alu) begin
+            addr = alu_read_mem.addr;
+            width = alu_read_mem.width;
+            cache_we = 0;
+            read_mem = alu_read_mem;
+        end else if (execute_fpu) begin
+            addr = fpu_read_mem.addr;
+            width = fpu_read_mem.width;
+            cache_we = 0;
+            read_mem = fpu_read_mem;
+        end else if (execute_atomic) begin
+            addr = atom_read_mem.addr;
+            width = atom_read_mem.width;
+            cache_we = 0;
+            read_mem = atom_read_mem;
+        end
+
+        write_reg_back.index = read_mem.target;
+        write_reg_back.kind  = read_mem.kind;
+    end
+
+    always_comb begin
+        for (int i = 0; i < $size(trap_ctrl_write_csr); i++) begin
+            write_csr[i] = trap_ctrl_write_csr[i];
+        end
+    end
+
     always_ff @(negedge rst) begin
         pc <= 0;
         cache_we <= 0;
@@ -216,7 +289,9 @@ module cpu (
     end
 
     always_ff @(posedge clk) begin
-        pre_state <= state;
+        if (pre_state != state) pre_state <= state;
+        write_reg_back.enable <= 0;
+
         case (state)
             Fetch: begin
                 //禁用所有并行模块
@@ -255,60 +330,25 @@ module cpu (
                         pc <= alu_write_pc.val;
                     end
                     if (alu_read_mem.enable) begin
-                        addr <= alu_read_mem.addr;
-                        width <= alu_read_mem.width;
-                        cache_we <= 0;
-
-                        read_mem <= alu_read_mem;
-
                         state <= ReadMem;
                     end
                     if (alu_write_mem.enable) begin
-                        addr <= alu_write_mem.addr;
-                        width <= alu_write_mem.width;
-                        cache_in <= alu_write_mem.data;
-                        cache_we <= 1;
-
                         state <= WriteMem;
-                    end
-                    if (alu_write_reg.enable) begin
-                        write_reg <= alu_write_reg;
                     end
                 end else if (fpu_out_ready) begin
                     state <= DetectTrap;
                     if (fpu_read_mem.enable) begin
-                        addr <= fpu_read_mem.addr;
-                        width <= fpu_read_mem.width;
-                        cache_we <= 0;
-
-                        read_mem <= fpu_read_mem;
-
                         state <= ReadMem;
                     end
                     if (fpu_write_mem.enable) begin
-                        addr <= fpu_write_mem.addr;
-                        width <= fpu_write_mem.width;
-                        cache_in <= fpu_write_mem.data;
-                        cache_we <= 1;
-
                         state <= WriteMem;
-                    end
-                    if (fpu_write_reg.enable) begin
-                        write_reg <= fpu_write_reg;
                     end
                 end else if (atom_out_ready) begin
                     state <= DetectTrap;
-                    if (atom_write_reg.enable) begin
-                        write_reg <= fpu_write_reg;
-                    end
                 end else if (csr_unit_out_ready) begin
                     state <= DetectTrap;
-                    if (csr_unit_write_reg.enable) begin
-                        write_reg <= csr_unit_write_reg;
-                    end
                 end else if (trap_ctrl_out_ready) begin
                     state <= DetectTrap;
-                    write_csr <= trap_ctrl_write_csr;
                     if (trap_ctrl_write_pc[1].enable) begin
                         pc <= trap_ctrl_write_pc[1].val;
                     end
@@ -321,32 +361,29 @@ module cpu (
                         state <= Decode;
                     end
                     Execute: begin
-                        write_reg.enable <= 1;
-                        write_reg.index  <= read_mem.target;
-                        write_reg.kind   <= read_mem.kind;
+                        write_reg_back.enable <= 1;
                         case (read_mem.kind)
                             IntReg: begin
                                 case (read_mem.width)
-                                    Byte: write_reg.val <= cache_out_i8;
-                                    HalfWord: write_reg.val <= cache_out_i16;
-                                    Word, DoubleWord: write_reg.val <= cache_out_i32;
+                                    Byte: write_reg_back.val <= cache_out_i8;
+                                    HalfWord: write_reg_back.val <= cache_out_i16;
+                                    Word, DoubleWord: write_reg_back.val <= cache_out_i32;
                                 endcase
                             end
                             UIntReg: begin
                                 case (read_mem.width)
-                                    Byte: write_reg.val <= cache_out_u8;
-                                    HalfWord: write_reg.val <= cache_out_u16;
-                                    DoubleWord: write_reg.val <= cache_out_u32;
+                                    Byte: write_reg_back.val <= cache_out_u8;
+                                    HalfWord: write_reg_back.val <= cache_out_u16;
+                                    DoubleWord: write_reg_back.val <= cache_out_u32;
                                 endcase
                             end
-                            FloatReg, DoubleReg: write_reg.val <= cache_out;
+                            FloatReg, DoubleReg: write_reg_back.val <= cache_out;
                         endcase
                         state <= DetectTrap;
                     end
                 endcase
             end
             WriteMem: begin
-                cache_we <= 0;
                 state <= DetectTrap;
             end
             DetectTrap: begin
@@ -354,7 +391,6 @@ module cpu (
                 if (trap_ctrl_detect_out_ready) begin
                     trap_ctrl_detect_in_ready <= 0;
                     state <= Fetch;
-                    write_csr <= trap_ctrl_write_csr;
                     if (trap_ctrl_write_pc[0].enable) begin
                         pc <= trap_ctrl_write_pc[0].val;
                     end
