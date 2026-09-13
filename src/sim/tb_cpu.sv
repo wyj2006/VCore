@@ -14,10 +14,9 @@ module tb_cpu ();
     initial begin
         #0.5;
         rst = 0;
-        #0.5;
+        #1;
         rst = 1;
-        $readmemh("../../../../src/asm/matrix.txt", cpu.cache.data);
-        #5000;
+        #8000;
         $finish;
     end
 endmodule

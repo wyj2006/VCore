@@ -17,4 +17,17 @@ os.system(
     f"riscv64-unknown-elf-ld {filename}.o -o {filename}.elf -T linker.ld -m elf32lriscv"
 )
 os.system(f"riscv64-unknown-elf-objcopy -O binary {filename}.elf {filename}.bin")
-os.system(f"xxd -e -p -c 1 {filename}.bin>{filename}.txt")
+
+with open(f"{filename}.bin", mode="rb") as file:
+    data = file.read()
+with open(f"{filename}.coe", mode="w") as file:
+    file.write("memory_initialization_radix = 16;\n")
+    file.write("memory_initialization_vector =\n")
+    data = data.hex()
+    print(data)
+    data = [data[i : i + 2] for i in range(0, len(data), 2)]
+    for i in range(8, len(data) + 8, 8):
+        for _ in range(2):
+            file.write("".join(data[i - 4 : i][::-1]))
+            i -= 4
+        file.write(",\n")

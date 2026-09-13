@@ -265,6 +265,12 @@ module fpu (
     );
 
     always_ff @(posedge clk) begin
+        if (rst == 0) begin
+            state <= Idle;
+        end
+    end
+
+    always_ff @(posedge clk) begin
         out_ready <= 0;
         read_mem.enable <= 0;
         write_mem.enable <= 0;

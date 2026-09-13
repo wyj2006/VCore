@@ -10,6 +10,9 @@
 /src/asm/*.elf
 /src/asm/*.o
 /src/asm/*.txt
+/src/asm/*.coe
 
 /src/ip/**/*.*
 !/src/ip/**/*.xci
+
+*.tmp

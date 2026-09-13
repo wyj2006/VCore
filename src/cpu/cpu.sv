@@ -16,24 +16,31 @@ module cpu (
     State pre_state;
 
     bit [31:0] pc;
+    ReadMemReq pc_read_mem;
+    assign pc_read_mem.width = Word;
 
     ReadMemReq read_mem;
+    WriteMemReq write_mem;
     WriteRegReq write_reg_back;
 
-    bit [31:0] addr;
-    DataWidth width;
-    bit cache_we;
-    bit [63:0] cache_in;
     bit [63:0] cache_out;
+    bit read_done;
+    bit write_done;
     cache cache (
         .clk(clk),
         .rst(rst),
-        //atomic模块的请求有更高优先级且不由cpu管理
-        .addr(addr),
-        .width(width),
-        .we(cache_we),
-        .in(cache_in),
-        .out(cache_out)
+
+        .read_addr  (read_mem.addr),
+        .read_enable(read_mem.enable),
+        .read_width (read_mem.width),
+        .read_data  (cache_out),
+        .read_done  (read_done),
+
+        .write_addr  (write_mem.addr),
+        .write_data  (write_mem.data),
+        .write_width (write_mem.width),
+        .write_enable(write_mem.enable),
+        .write_done  (write_done)
     );
 
     bit [31:0] cache_out_u8;
@@ -72,6 +79,7 @@ module cpu (
     bit execute_csr_unit;
     bit execute_trap_ctrl;
     bit need_read_mem;
+    bit need_read_inst;
 
     assign execute_alu = op inside {[Lui : RemU]};
     assign execute_fpu = op inside {[FLW : FMoveDW]};
@@ -79,6 +87,7 @@ module cpu (
     assign execute_csr_unit = op inside {[CSRRW : CSRRCI]};
     assign execute_trap_ctrl = op inside {MRet, ECall, EBreak, Illegal};
     assign need_read_mem = op inside {LB, LH, LW, LBU, LHU, FLW, FSW, FLD, FSD, LRW};
+    assign need_read_inst = state == Fetch || (state == ReadMem && pre_state == Fetch);
 
     WriteRegReq write_reg;
     bit [63:0] reg_value[4];
@@ -228,46 +237,42 @@ module cpu (
     end
 
     always_comb begin
-        addr = 0;
-        width = Word;
-        cache_in = 0;
-        cache_we = 0;
-        read_mem = {0, 0, Word, IntReg, 0};
+        read_mem  = {0, 0, Word, IntReg, 0};
+        write_mem = {0, 0, Word, 0};
 
-        if (execute_alu && alu_write_mem.enable) begin
-            addr = alu_write_mem.addr;
-            width = alu_write_mem.width;
-            cache_in = alu_write_mem.data;
-            cache_we = 1;
-        end else if (execute_fpu && fpu_write_mem.enable) begin
-            addr = fpu_write_mem.addr;
-            width = fpu_write_mem.width;
-            cache_in = fpu_write_mem.data;
-            cache_we = 1;
-        end else if (execute_atomic && atom_write_mem.enable) begin
-            addr = atom_write_mem.addr;
-            width = atom_write_mem.width;
-            cache_in = atom_write_mem.data;
-            cache_we = 1;
+        if (need_read_inst) begin
+            read_mem = pc_read_mem;
         end else if (execute_alu) begin
-            addr = alu_read_mem.addr;
-            width = alu_read_mem.width;
-            cache_we = 0;
-            read_mem = alu_read_mem;
+            read_mem  = alu_read_mem;
+            write_mem = alu_write_mem;
         end else if (execute_fpu) begin
-            addr = fpu_read_mem.addr;
-            width = fpu_read_mem.width;
-            cache_we = 0;
-            read_mem = fpu_read_mem;
+            read_mem  = fpu_read_mem;
+            write_mem = fpu_write_mem;
         end else if (execute_atomic) begin
-            addr = atom_read_mem.addr;
-            width = atom_read_mem.width;
-            cache_we = 0;
-            read_mem = atom_read_mem;
+            read_mem  = atom_read_mem;
+            write_mem = atom_write_mem;
         end
 
         write_reg_back.index = read_mem.target;
         write_reg_back.kind  = read_mem.kind;
+
+        case (read_mem.kind)
+            IntReg: begin
+                case (read_mem.width)
+                    Byte: write_reg_back.val = cache_out_i8;
+                    HalfWord: write_reg_back.val = cache_out_i16;
+                    Word, DoubleWord: write_reg_back.val = cache_out_i32;
+                endcase
+            end
+            UIntReg: begin
+                case (read_mem.width)
+                    Byte: write_reg_back.val = cache_out_u8;
+                    HalfWord: write_reg_back.val = cache_out_u16;
+                    DoubleWord: write_reg_back.val = cache_out_u32;
+                endcase
+            end
+            FloatReg, DoubleReg: write_reg_back.val = cache_out;
+        endcase
     end
 
     always_comb begin
@@ -276,21 +281,22 @@ module cpu (
         end
     end
 
-    always_ff @(negedge rst) begin
-        pc <= 0;
-        cache_we <= 0;
-        alu_in_ready <= 0;
-        fpu_in_ready <= 0;
-        atom_in_ready <= 0;
-        csr_unit_in_ready <= 0;
-        trap_ctrl_in_ready <= 0;
-        trap_ctrl_detect_in_ready <= 0;
-        state <= Fetch;
+    always_ff @(posedge clk) begin
+        if (rst == 0) begin
+            pc <= 0;
+            alu_in_ready <= 0;
+            fpu_in_ready <= 0;
+            atom_in_ready <= 0;
+            csr_unit_in_ready <= 0;
+            trap_ctrl_in_ready <= 0;
+            trap_ctrl_detect_in_ready <= 0;
+            state <= Fetch;
+        end
     end
 
     always_ff @(posedge clk) begin
-        if (pre_state != state) pre_state <= state;
         write_reg_back.enable <= 0;
+        pc_read_mem.enable <= 0;
 
         case (state)
             Fetch: begin
@@ -299,11 +305,11 @@ module cpu (
                 fpu_in_ready <= 0;
                 atom_in_ready <= 0;
 
-                addr <= pc;
+                pc_read_mem.enable <= 1;
+                pc_read_mem.addr <= pc;
                 pc <= pc + 4;
-                width <= Word;
-                cache_we <= 0;
 
+                pre_state <= Fetch;
                 state <= ReadMem;
             end
             Decode: begin
@@ -316,6 +322,7 @@ module cpu (
                 state <= Execute;
             end
             Execute: begin
+                pre_state <= Execute;
                 //只触发一次
                 alu_in_ready <= 0;
                 fpu_in_ready <= 0;
@@ -355,36 +362,23 @@ module cpu (
                 end
             end
             ReadMem: begin
-                case (pre_state)
-                    Fetch: begin
-                        inst  <= cache_out_u32;
-                        state <= Decode;
-                    end
-                    Execute: begin
-                        write_reg_back.enable <= 1;
-                        case (read_mem.kind)
-                            IntReg: begin
-                                case (read_mem.width)
-                                    Byte: write_reg_back.val <= cache_out_i8;
-                                    HalfWord: write_reg_back.val <= cache_out_i16;
-                                    Word, DoubleWord: write_reg_back.val <= cache_out_i32;
-                                endcase
-                            end
-                            UIntReg: begin
-                                case (read_mem.width)
-                                    Byte: write_reg_back.val <= cache_out_u8;
-                                    HalfWord: write_reg_back.val <= cache_out_u16;
-                                    DoubleWord: write_reg_back.val <= cache_out_u32;
-                                endcase
-                            end
-                            FloatReg, DoubleReg: write_reg_back.val <= cache_out;
-                        endcase
-                        state <= DetectTrap;
-                    end
-                endcase
+                if (read_done) begin
+                    case (pre_state)
+                        Fetch: begin
+                            inst  <= cache_out_u32;
+                            state <= Decode;
+                        end
+                        Execute: begin
+                            write_reg_back.enable <= 1;
+                            state <= DetectTrap;
+                        end
+                    endcase
+                end
             end
             WriteMem: begin
-                state <= DetectTrap;
+                if (write_done) begin
+                    state <= DetectTrap;
+                end
             end
             DetectTrap: begin
                 trap_ctrl_detect_in_ready <= 1;

@@ -93,6 +93,12 @@ module alu (
     end
 
     always_ff @(posedge clk) begin
+        if (rst == 0) begin
+            state <= Idle;
+        end
+    end
+
+    always_ff @(posedge clk) begin
         out_ready <= 0;
         write_reg.kind <= IntReg;
         write_pc.enable <= 0;

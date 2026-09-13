@@ -125,11 +125,11 @@ typedef enum bit [6:0] {
     Illegal
 } Opcode;
 
-typedef enum bit [1:0] {
-    Byte,
-    HalfWord,
-    Word,
-    DoubleWord
+typedef enum bit [3:0] {
+    Byte = 1,
+    HalfWord = 2,
+    Word = 4,
+    DoubleWord = 8
 } DataWidth;
 
 typedef struct {
